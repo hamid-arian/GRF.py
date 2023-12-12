@@ -1,0 +1,19 @@
+import unittest
+from Tree import Tree
+from TreeOptions import TreeOptions
+from TreeTrainer import TreeTrainer
+
+class TestTree(unittest.TestCase):
+    def test_pruning_behaves_as_expected(self):
+        # Implement the test logic
+        pass
+
+    def test_pruning_is_idempotent(self):
+        # Implement the test logic
+        pass
+
+# Additional tests for TreeOptions and TreeTrainer
+# ...
+
+if __name__ == '__main__':
+    unittest.main()
