@@ -1,6 +1,3 @@
-要将上述的C++代码转换成Python代码，需要进行一项繁重的工作，因为C++和Python是不同的编程语言，它们的语法和语义也有很大差异。以下是将这段C++代码转换成Python代码的示例：
-
-```python
 import numpy as np
 from numpy.linalg import solve, LinAlgError
 
@@ -128,4 +125,27 @@ class LocalLinearPredictionStrategy:
                 continue
 
             num_good_groups += 1
-            group_p
+            group_psi = 0
+
+            for j in range(ci_group_size):
+                b = group * ci_group_size + j
+                psi_1 = 0
+
+                for sample in samples_by_tree[b]:
+                    psi_1 += pseudo_residual[sample_index_map[sample]]
+
+                psi_1 /= len(samples_by_tree[b])
+                psi_squared += psi_1 * psi_1
+                group_psi += psi_1
+
+            group_psi /= ci_group_size
+            psi_grouped_squared += group_psi * group_psi
+            avg_score += group_psi
+
+        avg_score /= num_good_groups
+        var_between = psi_grouped_squared / num_good_groups - avg_score * avg_score
+        var_total = psi_squared / (num_good_groups * ci_group_size) - avg_score * avg_score
+        group_noise = (var_total - var_between) / (ci_group_size - 1)
+        var_debiased = var_between - group_noise
+
+        return [var_debiased]
