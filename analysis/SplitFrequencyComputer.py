@@ -1,34 +1,38 @@
-
 class SplitFrequencyComputer:
-    def compute(self, forest, max_depth):
-        num_variables = forest.get_num_variables()
-        result = [[0 for _ in range(num_variables)] for _ in range(max_depth)]
+    def compute(self, forest, max_depth):
+        """
+        Compute the frequency of splits for each variable at different depths in a forest.
 
-        for tree in forest.get_trees():
-            child_nodes = tree.get_child_nodes()
+        :param forest: The Forest object.
+        :param max_depth: The maximum depth to which the trees should be traversed.
+        :return: A 2D list where each sublist represents a depth, and each element in the sublist 
+                 is the count of splits for a variable at that depth.
+        """
+        num_variables = forest.get_num_variables()
+        result = [[0 for _ in range(num_variables)] for _ in range(max_depth)]
 
-            depth = 0
-            level = [tree.get_root_node()]
+        for tree in forest.get_trees():
+            child_nodes = tree.get_child_nodes()
 
-            while level and depth < max_depth:
-                next_level = []
+            depth = 0
+            level = [tree.get_root_node()]
 
-                for node in level:
-                    if tree.is_leaf(node):
-                        continue
+            while len(level) > 0 and depth < max_depth:
+                next_level = []
 
-                    variable = tree.get_split_vars()[node]
-                    result[depth][variable] += 1
+                for node in level:
+                    if tree.is_leaf(node):
+                        continue
 
-                    next_level.extend(child_nodes[0][node])
-                    next_level.extend(child_nodes[1][node])
+                    variable = tree.get_split_vars()[node]
+                    result[depth][variable] += 1
 
-                level = next_level
-                depth += 1
+                    next_level.append(child_nodes[0][node])
+                    next_level.append(child_nodes[1][node])
 
-        return result
+                level = next_level
+                depth += 1
 
-# Example Usage
-# forest = ... # Initialize your Forest object
-# computer = SplitFrequencyComputer()
-# split_frequencies = computer.compute(forest, max_depth)
+        return result
+
+

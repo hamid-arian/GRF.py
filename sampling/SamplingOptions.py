@@ -1,33 +1,44 @@
-from typing import List, Dict
-
 class SamplingOptions:
-    def __init__(self, samples_per_cluster: int = 0, sample_clusters: List[int] = None):
-        if sample_clusters is None:
-            sample_clusters = []
-        
-        self.num_samples_per_cluster = samples_per_cluster
-        self.clusters = {}
-        
-        cluster_ids = {}
-        for cluster in sample_clusters:
-            if cluster not in cluster_ids:
-                cluster_id = len(cluster_ids)
-                cluster_ids[cluster] = cluster_id
-        
-        for sample, cluster in enumerate(sample_clusters):
-            cluster_id = cluster_ids[cluster]
-            if cluster_id not in self.clusters:
-                self.clusters[cluster_id] = []
-            self.clusters[cluster_id].append(sample)
+    """
+    A class to handle sampling options, particularly for cluster-based sampling.
+    """
 
-    def get_samples_per_cluster(self) -> int:
+    def __init__(self, samples_per_cluster=0, sample_clusters=None):
+        """
+        Initialize SamplingOptions.
+
+        :param samples_per_cluster: The number of samples per cluster.
+        :param sample_clusters: A list of sample clusters.
+        """
+        self.num_samples_per_cluster = samples_per_cluster
+
+        if sample_clusters is None:
+            self.clusters = []
+        else:
+            # Map the provided clusters to IDs in the range 0 ... num_clusters
+            cluster_ids = {}
+            for cluster in sample_clusters:
+                if cluster not in cluster_ids:
+                    cluster_ids[cluster] = len(cluster_ids)
+
+            # Populate the index of each cluster ID with the samples it contains
+            self.clusters = [[] for _ in range(len(cluster_ids))]
+            for sample, cluster in enumerate(sample_clusters):
+                cluster_id = cluster_ids[cluster]
+                self.clusters[cluster_id].append(sample)
+
+    def get_samples_per_cluster(self):
+        """
+        Get the number of samples per cluster.
+
+        :return: The number of samples per cluster.
+        """
         return self.num_samples_per_cluster
 
-    def get_clusters(self) -> Dict[int, List[int]]:
+    def get_clusters(self):
+        """
+        Get the clusters.
+
+        :return: The clusters as a list of lists.
+        """
         return self.clusters
-
-
-# Example usage:
-# sampling_options = SamplingOptions(samples_per_cluster=3, sample_clusters=[0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 2, 2, 2, 2, 0, 3, 3, 3, 2, 3])
-# print(sampling_options.get_samples_per_cluster())
-# print(sampling_options.get_clusters())

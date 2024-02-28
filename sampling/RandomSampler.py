@@ -1,47 +1,105 @@
-import random
 import math
-import numpy as np
-
-class SamplingOptions:
-    def __init__(self, samples_per_cluster=0, clusters=None):
-        if clusters is None:
-            clusters = []
-        self.num_samples_per_cluster = samples_per_cluster
-        self.clusters = clusters
-
-    def get_clusters(self):
-        return self.clusters
-
-    def get_samples_per_cluster(self):
-        return self.num_samples_per_cluster
-
+import random
 
 class RandomSampler:
+    """
+    A class for random sampling and subsampling of data.
+    """
+
     def __init__(self, seed, options):
+        """
+        Initialize the RandomSampler with a seed and options.
+
+        :param seed: The seed for the random number generator.
+        :param options: An object containing sampling options.
+        """
         self.random_number_generator = random.Random(seed)
         self.options = options
 
     def sample_clusters(self, num_rows, sample_fraction, samples):
+        """
+        Sample clusters of data.
+
+        :param num_rows: The number of rows in the data.
+        :param sample_fraction: The fraction of data to sample.
+        :param samples: A list to store the sampled indices.
+        """
         if not self.options.get_clusters():
             self.sample(num_rows, sample_fraction, samples)
         else:
             num_samples = len(self.options.get_clusters())
             self.sample(num_samples, sample_fraction, samples)
 
+    def sample(self, num_samples, sample_fraction, samples):
+        """
+        Sample a fraction of data.
+
+        :param num_samples: The number of samples to draw.
+        :param sample_fraction: The fraction of data to sample.
+        :param samples: A list to store the sampled indices.
+        """
+        num_samples_inbag = int(num_samples * sample_fraction)
+        samples.extend(self.random_number_generator.sample(range(num_samples), num_samples_inbag))
+
+    def subsample(self, samples, sample_fraction, subsamples, oob_samples=None):
+        """
+        Subsample a fraction of the provided samples.
+
+        :param samples: The samples to subsample from.
+        :param sample_fraction: The fraction of data to subsample.
+        :param subsamples: A list to store the subsampled indices.
+        :param oob_samples: A list to store out-of-bag samples if needed.
+        """
+
+        shuffled_sample = samples
+        self.random_number_generator.shuffle(shuffled_sample)
+
+        subsample_size = int(math.ceil(len(samples) * sample_fraction))
+        subsamples.extend(shuffled_sample[:subsample_size])
+
+        if oob_samples is not None:
+            oob_samples.extend(shuffled_sample[subsample_size:])
+
+    def subsample_with_size(self, samples, subsample_size, subsamples):
+        """
+        Subsample a specific number of samples.
+
+        :param samples: The samples to subsample from.
+        :param subsample_size: The number of samples to draw.
+        :param subsamples: A list to store the subsampled indices.
+        """
+        shuffled_sample = samples[:]
+        self.random_number_generator.shuffle(shuffled_sample)
+        subsamples.extend(shuffled_sample[:subsample_size])
+
     def sample_from_clusters(self, clusters, samples):
+        """
+        Sample from clusters.
+
+        :param clusters: The cluster indices.
+        :param samples: A list to store the sampled indices.
+        """
         if not self.options.get_clusters():
             samples.extend(clusters)
         else:
             samples_by_cluster = self.options.get_clusters()
             for cluster in clusters:
                 cluster_samples = samples_by_cluster[cluster]
+
                 if len(cluster_samples) <= self.options.get_samples_per_cluster():
                     samples.extend(cluster_samples)
                 else:
-                    subsamples = self.subsample_with_size(cluster_samples, self.options.get_samples_per_cluster())
+                    subsamples = []
+                    self.subsample_with_size(cluster_samples, self.options.get_samples_per_cluster(), subsamples)
                     samples.extend(subsamples)
 
     def get_samples_in_clusters(self, clusters, samples):
+        """
+        Get samples in clusters.
+
+        :param clusters: The cluster indices.
+        :param samples: A list to store the samples from the clusters.
+        """
         if not self.options.get_clusters():
             samples.extend(clusters)
         else:
@@ -49,52 +107,80 @@ class RandomSampler:
                 cluster_samples = self.options.get_clusters()[cluster]
                 samples.extend(cluster_samples)
 
-    def sample(self, num_samples, sample_fraction, samples):
-        num_samples_inbag = int(num_samples * sample_fraction)
-        self.shuffle_and_split(samples, num_samples, num_samples_inbag)
+    def shuffle_and_split(self, n_all, size):
+        """
+        Shuffle and split the samples.
 
-    def subsample(self, samples, sample_fraction, subsamples, oob_samples=None):
-        shuffled_sample = np.random.permutation(samples)
+        :param n_all: The total number of samples.
+        :param size: The size of the desired sample.
+        :return: A list of shuffled and split samples.
+        """
+        samples = list(range(n_all))
+        self.random_number_generator.shuffle(samples)
+        return samples[:size]
 
-        subsample_size = math.ceil(len(samples) * sample_fraction)
-        subsamples.extend(shuffled_sample[:subsample_size])
+    def draw(self, max, skip, num_samples):
+        """
+        Draw samples, choosing the method based on the number of samples.
 
-        if oob_samples is not None:
-            oob_samples.extend(shuffled_sample[subsample_size:])
-
-    def subsample_with_size(self, samples, subsample_size):
-        shuffled_sample = np.random.permutation(samples)
-        return shuffled_sample[:subsample_size]
-
-    def shuffle_and_split(self, samples, n_all, size):
-        samples.extend(np.random.permutation(np.arange(n_all))[:size])
-
-    def draw(self, result, max_val, skip, num_samples):
-        if num_samples < max_val / 10:
-            self.draw_simple(result, max_val, skip, num_samples)
+        :param max: The maximum value for drawing.
+        :param skip: A set of values to skip.
+        :param num_samples: The number of samples to draw.
+        :return: A list of drawn samples.
+        """
+        if num_samples < max / 10:
+            return self.draw_simple(max, skip, num_samples)
         else:
-            self.draw_fisher_yates(result, max_val, skip, num_samples)
+            return self.draw_fisher_yates(max, skip, num_samples)
 
-    def draw_simple(self, result, max_val, skip, num_samples):
-        result.extend(np.random.choice([i for i in range(max_val) if i not in skip], size=num_samples, replace=False))
+    def draw_simple(self, max, skip, num_samples):
+        """
+        Draw samples using a simple method.
 
-    def draw_fisher_yates(self, result, max_val, skip, num_samples):
-        result.extend(np.setdiff1d(np.random.permutation(max_val), list(skip))[:num_samples])
+        :param max: The maximum value for drawing.
+        :param skip: A set of values to skip.
+        :param num_samples: The number of samples to draw.
+        :return: A list of drawn samples.
+        """
+        result = []
+        temp = [False] * max
+
+        while len(result) < num_samples:
+            draw = self.random_number_generator.randint(0, max - 1 - len(skip))
+            for skip_value in sorted(skip):
+                if draw >= skip_value:
+                    draw += 1
+            if not temp[draw]:
+                temp[draw] = True
+                result.append(draw)
+
+        return result
+
+    def draw_fisher_yates(self, max, skip, num_samples):
+        """
+        Draw samples using the Fisher-Yates shuffle algorithm.
+
+        :param max: The maximum value for drawing.
+        :param skip: A set of values to skip.
+        :param num_samples: The number of samples to draw.
+        :return: A list of drawn samples.
+        """
+        result = list(range(max))
+        for skip_value in sorted(skip, reverse=True):
+            result.pop(skip_value)
+
+        for i in range(num_samples):
+            j = self.random_number_generator.randint(i, max - len(skip) - 1)
+            result[i], result[j] = result[j], result[i]
+
+        return result[:num_samples]
 
     def sample_poisson(self, mean):
-        return np.random.poisson(mean)
+        """
+        Sample from a Poisson distribution.
 
+        :param mean: The mean of the Poisson distribution.
+        :return: A random sample from the Poisson distribution.
+        """
+        return self.random_number_generator.poisson(mean)
 
-# Example usage:
-seed_value = 42
-sampling_options = SamplingOptions(samples_per_cluster=3, clusters=None)
-random_sampler = RandomSampler(seed=seed_value, options=sampling_options)
-
-# Call the necessary methods on random_sampler
-# For example:
-# random_sampler.sample_clusters(100, 0.5, samples)
-# random_sampler.sample_from_clusters(clusters, samples)
-# random_sampler.get_samples_in_clusters(clusters, samples)
-# random_sampler.subsample(samples, 0.5, subsamples, oob_samples)
-# random_sampler.draw(result, max_val, skip, num_samples)
-# random_sampler.sample_poisson(mean)
